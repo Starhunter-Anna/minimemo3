@@ -1,17 +1,9 @@
-const CACHE_NAME = 'minimemo-v2';
+const CACHE_NAME = 'minimemo-v3';
 
-// Files we know are local
+// Only cache the shell. Assets will be cached at runtime.
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/index.tsx',
-  '/App.tsx',
-  '/types.ts',
-  '/constants.ts',
-  '/components/NoteCard.tsx',
-  '/components/NoteEditor.tsx',
-  '/components/FilterBar.tsx',
-  '/components/SettingsModal.tsx',
   '/manifest.json'
 ];
 
@@ -44,7 +36,6 @@ self.addEventListener('fetch', (event) => {
 
   // Strategy for External CDN Assets (React, Fonts, Tailwind)
   // Stale-While-Revalidate: Use cache if available, but update in background.
-  // Essential for making the CDN-based React app work offline.
   if (url.hostname.includes('tailwindcss.com') ||
       url.hostname.includes('googleapis.com') ||
       url.hostname.includes('gstatic.com') ||
@@ -54,20 +45,17 @@ self.addEventListener('fetch', (event) => {
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(event.request);
         
-        // Create a promise to fetch and update cache
         const fetchPromise = fetch(event.request)
           .then((networkResponse) => {
-            // Only cache valid responses
             if(networkResponse.ok) {
                 cache.put(event.request, networkResponse.clone());
             }
             return networkResponse;
           })
           .catch(() => {
-            // Network failed, nothing to do here
+             // Network failed
           });
 
-        // Return cached response immediately if available, otherwise wait for network
         return cachedResponse || fetchPromise;
       })
     );
@@ -75,10 +63,31 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Strategy for Local App Files
-  // Cache First, fall back to network
+  // Cache First for assets, but we need to cache them dynamically as they are requested
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(event.request).then((networkResponse) => {
+        // Check if we received a valid response
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+
+        // IMPORTANT: Clone the response. A response is a stream
+        // and because we want the browser to consume the response
+        // as well as the cache consuming the response, we need
+        // to clone it so we have two streams.
+        const responseToCache = networkResponse.clone();
+
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return networkResponse;
+      });
     })
   );
 });
