@@ -1,0 +1,14 @@
+{
+  "appId": "com.minimemo.app",
+  "appName": "MiniMemo",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystoreAlias": null
+    }
+  }
+}
